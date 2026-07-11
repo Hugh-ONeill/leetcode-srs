@@ -1,0 +1,9 @@
+[Unit]
+Description=LeetCode SRS daily reminder (persistent, click-to-open)
+
+[Service]
+Type=oneshot
+# The notification is persistent (-t 0) and blocks until clicked/dismissed,
+# so the start must be allowed to run indefinitely.
+TimeoutStartSec=infinity
+ExecStart=%h/Developer/leetcode-srs/remind.sh

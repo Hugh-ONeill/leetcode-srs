@@ -1,0 +1,10 @@
+[Unit]
+Description=Fire the LeetCode SRS reminder once a day
+
+[Timer]
+# 09:30 local, with catch-up if the machine was asleep at the trigger time.
+OnCalendar=*-*-* 09:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
