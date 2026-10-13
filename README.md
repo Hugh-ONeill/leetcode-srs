@@ -142,23 +142,31 @@ the model stays warm across a session.
 To add a batch, edit `seed_data.py` then `./srs.py import` — existing items and
 their schedules are left untouched.
 
-## Daily reminder
+## Daily session
 
-A systemd **user** timer fires a desktop notification at 09:30 with the due
-count (`Persistent=true`, so it catches up if the laptop was asleep).
+There is no reminder to click. A systemd **user** unit opens the day's review in
+its own kitty window as soon as the morning job-scan report is written
+(`job-scan.service` names it in `OnSuccess=`/`OnFailure=`, so it fires whichever
+way the scan ends, usually between 07:10 and 07:35). The window sits at the
+first prompt until you get to the keyboard, and the session is over before
+you'd normally open a project. Close the window when you're done: while it is
+open the unit counts as running and the next morning's trigger is a no-op.
 
 ```bash
-systemctl --user list-timers leetcode-srs-remind.timer
-systemctl --user start leetcode-srs-remind.service   # test it now
-# edit time in systemd/leetcode-srs-remind.timer, then:
-systemctl --user daemon-reload
+systemctl --user start leetcode-srs-daily.service   # open a session now
+systemctl --user status leetcode-srs-daily.service
 ```
+
+The unit is `systemd/leetcode-srs-daily.service`, linked into
+`~/.config/systemd/user/`. It replaced a 09:30 notification (2026-10-13) that
+was dismissed every day because it landed mid-flow or after hours.
+
 
 ## Files
 
 - `srs.py` — the whole engine (CLI, SM-2 scheduler, SQLite).
 - `seed_data.py` — DS cards, pattern cards, and the problem backlog. Edit + `import`.
-- `systemd/` — the reminder timer/service (symlinked into `~/.config/systemd/user/`).
+- `systemd/` — the daily-session unit (linked into `~/.config/systemd/user/`).
 - DB lives at `~/.local/share/leetcode-srs/srs.db`.
 
 ## How to actually use it (the habit)

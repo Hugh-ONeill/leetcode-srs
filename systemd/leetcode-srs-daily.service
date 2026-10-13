@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily LeetCode SRS session in a kitty window
+# No timer of its own: job-scan.service names this unit in OnSuccess=/OnFailure=,
+# so the window opens the moment the morning report is written (07:10-07:35),
+# whichever way the scan ended. The window waits at the first prompt until you
+# sit down. While a window is open the unit is active and the next morning's
+# trigger is a no-op, so closing the window is how a day gets marked done.
+
+[Service]
+Type=simple
+# kitty reads WAYLAND_DISPLAY / HYPRLAND_INSTANCE_SIGNATURE from the systemd user
+# environment, which the Hyprland session imports at login.
+ExecStart=/usr/bin/kitty --hold --title "LeetCode SRS" --class leetcode-srs %h/Developer/leetcode-srs/srs.py review
