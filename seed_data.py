@@ -1,123 +1,238 @@
 """Seed content for the LeetCode SRS.
 
 Three kinds of items:
-  - DS_CARDS:      data-structure recall (API + complexity). Fixes "can't recall
-                   the structure itself on the fly."
-  - PATTERN_CARDS: signal -> pattern/structure decision drills. Fixes "I don't
-                   know *which* tool a problem wants." Front is a problem-shape;
-                   back is the tool + why. No coding.
+  - DS_CARDS:      data-structure recall. ONE fact per card so a grade is
+                   unambiguous: you either had that fact or you didn't.
+  - PATTERN_CARDS: signal -> tool decision drills. Front is a problem-shape;
+                   back is the TOOL ONLY (that's what you grade on). The "why"
+                   is shown after the reveal as a reminder, never as the answer.
   - PROBLEMS:      pattern-organized re-solve backlog. The point is COLD re-solve
                    from memory, not first-time exposure.
 
-Edit freely, then re-run `srs.py import` to add anything new (existing items and
-their schedules are left untouched).
+Every card carries a `hint`: a nudge that points at the answer without
+containing it. Hints are the only thing `?` reveals, so a hint never hands you
+the back of the card. Problems get a per-pattern nudge (PATTERN_NUDGES) as
+their first hint, then the pattern name, then your own note.
+
+Edit freely, then re-run `srs.py import`: new cards are added, problems keep
+their schedules, and ds/pattern cards that no longer appear here are retired.
 """
 
-# (front, back)
+# {"front", "back", "hint", "why"?}
 DS_CARDS = [
-    ("Hash map / hash set — operations and complexity?",
-     "insert / lookup / delete: avg O(1), worst O(n). No ordering. "
-     "Reach for it when you need fast membership, counting, or last-seen-index."),
-    ("Binary heap (priority queue) — operations and complexity?",
-     "push O(log n), pop-min/max O(log n), peek O(1), build-from-list O(n). "
-     "Use for: repeatedly get extreme element, top-K, merge-K, streaming median. "
-     "Python: heapq is a MIN-heap; push negatives for a max-heap."),
-    ("Stack — behavior, ops, when to reach for it?",
-     "LIFO. push/pop/peek all O(1). Use for: reversal, matching/brackets, "
-     "backtracking-by-hand, undo, and monotonic-stack (next greater/smaller)."),
-    ("Queue / deque — behavior, ops, uses?",
-     "Queue = FIFO. deque = O(1) push/pop at BOTH ends. "
-     "Use for: BFS (queue), sliding-window-maximum (monotonic deque). "
-     "Python: collections.deque."),
-    ("Balanced BST / sorted container — ops and what it buys you?",
-     "insert / search / delete O(log n) AND ordered iteration / "
-     "floor / ceiling / range queries. Use when you need a hash map's speed "
-     "but ALSO order. Python has no built-in; use sortedcontainers or a heap/bisect."),
-    ("Union-Find (disjoint set) — ops, complexity, uses?",
-     "union + find: ~O(1) amortized with path-compression + union-by-rank. "
-     "Use for: connected components, cycle detection in UNDIRECTED graphs, "
-     "Kruskal's MST, dynamic connectivity."),
-    ("Trie (prefix tree) — ops, complexity, uses?",
-     "insert / search / startsWith: O(L) in the key length, independent of #keys. "
-     "Use for: prefix lookups, autocomplete, word-search-by-prefix, "
-     "dictionary problems."),
-    ("Adjacency list vs adjacency matrix — when each?",
-     "List: O(V+E) space, fast to iterate neighbors — default for sparse graphs. "
-     "Matrix: O(V^2) space, O(1) edge lookup — only for dense graphs or when you "
-     "constantly test 'is there an edge u->v?'."),
-    ("bisect (binary search on a sorted list) — what does it give you?",
-     "bisect_left/right find an insertion index in O(log n). Use to maintain a "
-     "sorted list, find floor/ceiling, or count elements < x. The building block "
-     "of 'binary search on the answer'."),
+    # hash map / set
+    {"front": "Hash map: insert / lookup / delete complexity?",
+     "back": "Average O(1), worst case O(n).",
+     "hint": "Two numbers: the usual case and the everything-collides case."},
+    {"front": "Hash map: what does it NOT give you?",
+     "back": "Ordering. Keys come back in no useful order.",
+     "hint": "Think about what a sorted container has that this lacks."},
+    {"front": "Hash set / map: three problem signals that call for it?",
+     "back": "Fast membership, counting occurrences, last-seen index of a value.",
+     "hint": "All three replace a nested 'have I seen this?' scan with one pass."},
+    # heap
+    {"front": "Binary heap: push and pop complexity?",
+     "back": "Both O(log n).",
+     "hint": "Think about the height of the tree."},
+    {"front": "Binary heap: peek, and build-from-a-list, complexity?",
+     "back": "Peek O(1). Build-heap from n items O(n), not O(n log n).",
+     "hint": "One is free; the other is cheaper than n separate pushes."},
+    {"front": "Heap: four problem shapes it is built for?",
+     "back": "Repeatedly take the extreme element; top-K; merge K sorted lists; streaming median.",
+     "hint": "What do you keep needing again and again as the set changes?"},
+    {"front": "Python heapq: which kind of heap, and how do you get the other?",
+     "back": "Min-heap only. Push negated values to fake a max-heap.",
+     "hint": "There is only one flavor; you fake the other with arithmetic."},
+    # stack
+    {"front": "Stack: order, and complexity of push / pop / peek?",
+     "back": "LIFO. All O(1).",
+     "hint": "Last in, ... ?"},
+    {"front": "Stack: problem signals that call for it?",
+     "back": "Reversal, bracket matching, undo, hand-rolled recursion, and "
+             "monotonic stack (next greater / smaller element).",
+     "hint": "Anything where the most recent unresolved thing is handled first."},
+    # queue / deque
+    {"front": "Queue vs deque: what each allows, at what cost?",
+     "back": "Queue: FIFO, push back / pop front, O(1). Deque: O(1) push and pop at BOTH ends.",
+     "hint": "One end versus two ends."},
+    {"front": "Deque: the two classic algorithms that need it?",
+     "back": "BFS (as a plain queue) and sliding-window maximum (as a monotonic deque).",
+     "hint": "One graph algorithm, one array algorithm."},
+    {"front": "Python: the deque class, and why not a list?",
+     "back": "collections.deque. A list's pop(0) is O(n).",
+     "hint": "It lives in the standard library's containers module."},
+    # balanced BST / sorted container
+    {"front": "Balanced BST / sorted container: insert, search, delete complexity?",
+     "back": "O(log n) each.",
+     "hint": "Height of a balanced tree."},
+    {"front": "Sorted container: what does it buy you that a hash map cannot?",
+     "back": "Order: ordered iteration, floor / ceiling (predecessor / successor), range queries.",
+     "hint": "Three operations, all about a value's neighbors."},
+    {"front": "Python: sorted-container options?",
+     "back": "No built-in. sortedcontainers.SortedList, or bisect on a list, "
+             "or a heap if you only ever need the extreme.",
+     "hint": "One third-party package, two standard-library workarounds."},
+    # union-find
+    {"front": "Union-Find: operations and amortized complexity?",
+     "back": "find and union, near O(1) amortized (inverse Ackermann) with "
+             "path compression + union by rank.",
+     "hint": "Two operations, two optimizations that make them nearly free."},
+    {"front": "Union-Find: problem signals?",
+     "back": "Connected components, cycle detection in an UNDIRECTED graph, "
+             "Kruskal's MST, dynamic connectivity as edges arrive.",
+     "hint": "Groups that merge and never split."},
+    {"front": "Union-Find: directed or undirected cycle detection?",
+     "back": "Undirected only. Directed cycles need DFS with colors or a topological sort.",
+     "hint": "It does not know which way an edge points."},
+    # trie
+    {"front": "Trie: insert / search / startsWith complexity?",
+     "back": "O(L) in the key length, independent of how many keys are stored.",
+     "hint": "What does the cost depend on, and what does it NOT depend on?"},
+    {"front": "Trie: problem signals?",
+     "back": "Prefix lookups, autocomplete, word search on a grid with a dictionary, "
+             "'does any stored word start with ...'.",
+     "hint": "The word 'prefix' is usually in the problem statement."},
+    # graphs representation
+    {"front": "Adjacency list: space, and the operation it is fast at?",
+     "back": "O(V+E) space. Iterating a node's neighbors costs its degree.",
+     "hint": "Space proportional to what is actually there."},
+    {"front": "Adjacency matrix: space, and the one thing it does in O(1)?",
+     "back": "O(V^2) space. 'Is there an edge u->v?' in O(1).",
+     "hint": "A table lookup."},
+    {"front": "Adjacency list vs matrix: when do you pick the matrix?",
+     "back": "Dense graphs, or when you constantly test edge existence. Otherwise the list.",
+     "hint": "Compare the number of edges to V^2."},
+    # bisect / binary search
+    {"front": "bisect_left vs bisect_right: what index does each return?",
+     "back": "An insertion index in O(log n). left = before any equal elements, right = after them.",
+     "hint": "They differ only when the value is already present."},
+    {"front": "bisect on a sorted list: three things you can do with it?",
+     "back": "Maintain a sorted list (insort), find floor / ceiling, count elements less than x.",
+     "hint": "All three are 'where would x go?'"},
+    {"front": "'Binary search on the answer': what makes it applicable?",
+     "back": "A feasibility check isFeasible(x) that is monotonic in x. Binary-search x "
+             "over its range: O(log range) checks.",
+     "hint": "You are not searching an array. What property of the check lets you halve the space?"},
+    # sorting as a tool
+    {"front": "Sorting first: cost, and what it unlocks?",
+     "back": "O(n log n). Unlocks two pointers, binary search, greedy-by-order, interval sweeps.",
+     "hint": "Often step zero of a pattern."},
 ]
 
-# (front = the problem-shape signal, back = the tool + why)
+# front = the problem-shape signal; back = the TOOL (graded); why = reminder after reveal
 PATTERN_CARDS = [
-    ("You need fast membership, dedup, or to count occurrences of values.",
-     "HASH SET / HASH MAP. O(1) lookup turns an O(n^2) scan into O(n). "
-     "First thing to try on most array problems."),
-    ("Find a pair/triplet hitting a target, or check a palindrome, in a SORTED array.",
-     "TWO POINTERS from both ends. Sortedness lets you move the pointer that "
-     "provably can't be in the answer. O(n) after the sort."),
-    ("Longest / shortest CONTIGUOUS subarray or substring meeting a constraint.",
-     "SLIDING WINDOW. Grow the right edge; shrink the left while the window is "
-     "invalid. O(n) — each element enters and leaves once."),
-    ("'Next greater/smaller element', bracket matching, or a monotonic relationship.",
-     "STACK (often a MONOTONIC stack). Pop while the new element breaks the "
-     "invariant; what you pop is resolved by the current element."),
-    ("Search in sorted data, OR 'minimize the maximum' / 'find the smallest feasible X'.",
-     "BINARY SEARCH — including binary search on the ANSWER. If you can write "
-     "isFeasible(x) that's monotonic in x, binary-search x. O(log range)."),
-    ("Repeatedly need the min/max of a changing set, top-K, merge-K, or a running median.",
-     "HEAP / PRIORITY QUEUE. For median, balance two heaps. For top-K, a size-K "
-     "heap gives O(n log k)."),
-    ("Reverse / reorder a linked list, detect a cycle, or find its middle.",
-     "SLOW & FAST POINTERS on the linked list. Fast moves 2x; cycle => they meet, "
-     "and when fast hits the end slow is at the middle."),
-    ("Hierarchical data: all root-to-leaf paths, subtree properties, BST queries.",
-     "TREE DFS (recursion). Decide pre/in/post-order. Return value bubbles "
-     "subtree facts up; parameters push context down."),
-    ("Level-by-level processing, or shortest path in an UNWEIGHTED graph/grid.",
-     "BFS with a QUEUE. First time you reach a node = fewest edges. Process one "
-     "full level per loop iteration when you need distance/depth."),
-    ("Connected components, flood fill, 'count the islands', undirected cycle check.",
-     "DFS/BFS flood fill, or UNION-FIND. Mark visited as you go. Union-Find shines "
-     "when edges arrive incrementally."),
-    ("Generate ALL subsets / permutations / combinations, or 'all ways to ...'.",
-     "BACKTRACKING. choose -> recurse -> un-choose. Prune dead branches early. "
-     "Exponential by nature; that's expected."),
-    ("Lookups or insertions keyed by string PREFIX.",
-     "TRIE. O(L) per operation regardless of how many words are stored."),
-    ("Optimal value (min/max/count-ways) over choices with OVERLAPPING subproblems.",
-     "DYNAMIC PROGRAMMING. Define the state, the recurrence, and base cases. "
-     "Memoize top-down or build a table bottom-up."),
-    ("DP over a grid, or over TWO sequences (edit distance, LCS, alignment).",
-     "2-D DP table. dp[i][j] relates cell (i,j) to its neighbors / previous chars. "
-     "Watch the base row/column."),
-    ("Weighted shortest path with NON-negative edges.",
-     "DIJKSTRA (min-heap of (dist, node)). Negative edges instead? Bellman-Ford. "
-     "All-pairs small graph? Floyd-Warshall."),
-    ("Ordering tasks under dependencies, or 'can this be finished given prerequisites?'.",
-     "TOPOLOGICAL SORT. Kahn's (BFS on in-degree) or DFS post-order. "
-     "A cycle => no valid ordering."),
-    ("Overlapping ranges: merge them, insert one, count rooms / removals.",
-     "SORT BY START, then sweep. For 'how many overlap at once' keep a MIN-HEAP "
-     "of end times (meeting rooms)."),
-    ("A locally-optimal choice that you can PROVE is globally optimal.",
-     "GREEDY. Cheaper than DP but you must justify the exchange argument — "
-     "interval scheduling, jump game, gas station."),
-    ("'Single number', subset enumeration by mask, parity/dedup with no extra space.",
-     "BIT MANIPULATION. XOR cancels pairs; (1<<i) tests/sets bits; iterate "
-     "subsets with for sub in range(mask): sub=(sub-1)&mask."),
-    ("Kth largest/smallest, but a full sort is wasteful.",
-     "HEAP of size K (O(n log k)), or QUICKSELECT (avg O(n), in place)."),
-    ("Two strings/arrays and you're comparing or transforming one into the other.",
-     "Think 2-D DP (LCS/edit distance) OR two pointers if one is sorted/a "
-     "subsequence check. Anagram/frequency compare => hash map of counts."),
-    ("The answer is a count of ways and small subproblems repeat.",
-     "DP, almost always. If choices are independent, it may be plain "
-     "combinatorics/math instead — sanity-check before building a table."),
+    {"front": "Fast membership, dedup, or counting occurrences of values.",
+     "back": "Hash set / hash map.",
+     "hint": "What replaces a 'have I seen this before?' scan with one pass?",
+     "why": "O(1) lookup turns an O(n^2) scan into O(n). First thing to try on most array problems."},
+    {"front": "Pair / triplet hitting a target, or a palindrome check, in a SORTED array.",
+     "back": "Two pointers from both ends.",
+     "hint": "Sorted means you can rule out one end at a time.",
+     "why": "Sortedness lets you move the pointer that provably cannot be in the answer. O(n) after the sort."},
+    {"front": "Longest / shortest CONTIGUOUS subarray or substring meeting a constraint.",
+     "back": "Sliding window.",
+     "hint": "Contiguous. Each element should enter and leave at most once.",
+     "why": "Grow the right edge; shrink the left while the window is invalid. O(n)."},
+    {"front": "Next greater / smaller element, bracket matching, a monotonic relationship.",
+     "back": "Stack, usually a monotonic stack.",
+     "hint": "The most recent unresolved element gets resolved first.",
+     "why": "Pop while the new element breaks the invariant; what you pop is resolved by the current element."},
+    {"front": "Search in sorted data, OR 'minimize the maximum' / 'smallest feasible X'.",
+     "back": "Binary search, including binary search on the answer.",
+     "hint": "Can one yes/no check halve the candidate space?",
+     "why": "If isFeasible(x) is monotonic in x, binary-search x. O(log range)."},
+    {"front": "Repeatedly need the min / max of a changing set, top-K, merge-K, running median.",
+     "back": "Heap / priority queue.",
+     "hint": "You keep asking for the extreme element after the set changes.",
+     "why": "Median: balance two heaps. Top-K: a size-K heap gives O(n log k)."},
+    {"front": "Reverse / reorder a linked list, detect a cycle, or find its middle.",
+     "back": "Slow and fast pointers.",
+     "hint": "No random access. Two walkers at different speeds.",
+     "why": "Fast moves 2x. A cycle means they meet; when fast hits the end, slow is at the middle."},
+    {"front": "Hierarchical data: root-to-leaf paths, subtree properties, BST queries.",
+     "back": "Tree DFS (recursion).",
+     "hint": "What does each subtree need to report up to its parent?",
+     "why": "Pick pre/in/post-order. Return values bubble subtree facts up; parameters push context down."},
+    {"front": "Level-by-level processing, or shortest path in an UNWEIGHTED graph / grid.",
+     "back": "BFS with a queue.",
+     "hint": "Unweighted. First arrival wins.",
+     "why": "First time you reach a node = fewest edges. Process one full level per loop iteration for depth."},
+    {"front": "Connected components, flood fill, 'count the islands', undirected cycle check.",
+     "back": "DFS / BFS flood fill, or Union-Find.",
+     "hint": "Paint everything reachable, then move to the next unpainted cell.",
+     "why": "Mark visited as you go. Union-Find shines when edges arrive incrementally."},
+    {"front": "Generate ALL subsets / permutations / combinations, or 'all ways to ...'.",
+     "back": "Backtracking.",
+     "hint": "The output itself is exponential. What does that say about the algorithm?",
+     "why": "choose -> recurse -> un-choose. Prune dead branches early. Exponential by nature."},
+    {"front": "Lookups or insertions keyed by string PREFIX.",
+     "back": "Trie.",
+     "hint": "A tree where the path spells the key.",
+     "why": "O(L) per operation regardless of how many words are stored."},
+    {"front": "Optimal value (min / max / count ways) over choices with OVERLAPPING subproblems.",
+     "back": "Dynamic programming.",
+     "hint": "The same subproblem keeps coming back.",
+     "why": "Define the state, the recurrence, and base cases. Memoize top-down or tabulate bottom-up."},
+    {"front": "DP over a grid, or over TWO sequences (edit distance, LCS, alignment).",
+     "back": "2-D DP table.",
+     "hint": "Two indices that move independently.",
+     "why": "dp[i][j] relates cell (i,j) to its neighbors or previous characters. Watch the base row / column."},
+    {"front": "Weighted shortest path with NON-negative edges.",
+     "back": "Dijkstra (min-heap of (dist, node)).",
+     "hint": "BFS, except a plain queue is not enough because edges have weights.",
+     "why": "Negative edges: Bellman-Ford. All-pairs on a small graph: Floyd-Warshall."},
+    {"front": "Ordering tasks under dependencies, or 'can this be finished given prerequisites?'.",
+     "back": "Topological sort.",
+     "hint": "A directed graph where the answer is an order.",
+     "why": "Kahn's (BFS on in-degree) or DFS post-order. A cycle means no valid ordering."},
+    {"front": "Overlapping ranges: merge them, insert one, count rooms / removals.",
+     "back": "Sort by start, then sweep.",
+     "hint": "What order makes overlaps adjacent?",
+     "why": "For 'how many overlap at once' keep a min-heap of end times (meeting rooms)."},
+    {"front": "A locally optimal choice that you can PROVE is globally optimal.",
+     "back": "Greedy.",
+     "hint": "No table, no recursion. One pass of best-now choices, plus a proof.",
+     "why": "Cheaper than DP but you must justify the exchange argument: interval scheduling, jump game, gas station."},
+    {"front": "'Single number', subset enumeration by mask, parity / dedup with no extra space.",
+     "back": "Bit manipulation.",
+     "hint": "What operation cancels a value against itself?",
+     "why": "XOR cancels pairs; (1<<i) tests / sets bits; iterate subsets with sub=(sub-1)&mask."},
+    {"front": "Kth largest / smallest, but a full sort is wasteful.",
+     "back": "Size-K heap (O(n log k)), or quickselect (average O(n), in place).",
+     "hint": "You only need one element's rank, not everyone's.",
+     "why": "Both avoid sorting everything."},
+    {"front": "Two strings / arrays, comparing or transforming one into the other.",
+     "back": "2-D DP (LCS / edit distance); two pointers if sorted or a subsequence check; "
+             "hash map of counts for anagrams.",
+     "hint": "Which relation is being asked: alignment, order, or multiset?",
+     "why": "The signal is which relation the problem is about."},
+    {"front": "The answer is a count of ways and small subproblems repeat.",
+     "back": "DP, or plain combinatorics if the choices are independent.",
+     "hint": "Do the choices interact, or is it just multiplication?",
+     "why": "Sanity-check whether choices interact before building a table."},
 ]
+
+# First hint for a problem, by pattern: a nudge that does not name the tool.
+# (Second hint = the pattern name, third = your own insight note.)
+PATTERN_NUDGES = {
+    "Arrays & Hashing": "What would one pass with O(1) lookups buy you?",
+    "Two Pointers": "Is the input sorted, or can you sort it? Then what can you rule out from an end?",
+    "Sliding Window": "The answer is contiguous. Each element should enter and leave once.",
+    "Stack": "The most recent unresolved element is the one that gets resolved next.",
+    "Binary Search": "Can a single yes/no check halve the candidate space?",
+    "Linked List": "No random access. Think about pointers that move at different speeds, or a dummy head.",
+    "Trees": "What must each subtree report to its parent for the answer to fall out?",
+    "Tries": "The word 'prefix' is the signal. A tree where the path spells the key.",
+    "Heap": "You keep needing the extreme element while the set keeps changing.",
+    "Backtracking": "The output is every valid arrangement. Choose, recurse, un-choose.",
+    "Graphs": "Reachability or distance. Which traversal, and what do you mark?",
+    "Advanced Graphs": "Weights or ordering constraints. A queue alone is not enough.",
+    "1-D DP": "The answer for position i depends only on answers for earlier positions.",
+    "2-D DP": "Two indices that move independently. Draw the table.",
+    "Greedy": "A best-now choice that you could defend with an exchange argument.",
+    "Intervals": "Sort by start. What becomes adjacent?",
+    "Bit Manipulation": "Which bit operation cancels or isolates what you need?",
+}
 
 # (title, leetcode-slug, pattern, difficulty)
 PROBLEMS = [

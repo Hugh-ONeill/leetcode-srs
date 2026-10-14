@@ -111,34 +111,68 @@ def init_schema(con):
     have = {r["name"] for r in con.execute("PRAGMA table_info(log)")}
     if "hints" not in have:
         con.execute("ALTER TABLE log ADD COLUMN hints INTEGER NOT NULL DEFAULT 0")
+    # hint = nudge shown by `?` (never the answer); why = reminder shown after reveal
+    have = {r["name"] for r in con.execute("PRAGMA table_info(items)")}
+    for col in ("hint", "why"):
+        if col not in have:
+            con.execute(f"ALTER TABLE items ADD COLUMN {col} TEXT")
     con.commit()
 
 
 def import_seed(con):
+    """Load seed_data: add new items, refresh card text/hints in place, give
+    problems their pattern nudge, and retire ds/pattern cards no longer in the
+    seed (problems are never removed). Existing schedules are untouched."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import seed_data as s
 
     added = 0
     cur = con.cursor()
-    def ins(kind, title, back=None, url=None, pattern=None, difficulty=None):
+    def ins(kind, title, back=None, url=None, pattern=None, difficulty=None,
+            hint=None, why=None):
         nonlocal added
         try:
             cur.execute(
-                "INSERT INTO items(kind,title,back,url,pattern,difficulty,created)"
-                " VALUES(?,?,?,?,?,?,?)",
-                (kind, title, back, url, pattern, difficulty, TODAY.isoformat()),
+                "INSERT INTO items(kind,title,back,url,pattern,difficulty,hint,why,created)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (kind, title, back, url, pattern, difficulty, hint, why, TODAY.isoformat()),
             )
             added += 1
         except sqlite3.IntegrityError:
-            pass  # already present; leave its schedule alone
+            # already present: keep its schedule, but refresh the card text
+            cur.execute("UPDATE items SET back=?, hint=?, why=? WHERE kind=? AND title=?",
+                        (back, hint, why, kind, title))
 
-    for front, back in s.DS_CARDS:
-        ins("ds", front, back=back, pattern="data-structures")
-    for front, back in s.PATTERN_CARDS:
-        ins("pattern", front, back=back, pattern="pattern-decision")
+    for c in s.DS_CARDS:
+        ins("ds", c["front"], back=c["back"], pattern="data-structures",
+            hint=c.get("hint"), why=c.get("why"))
+    for c in s.PATTERN_CARDS:
+        ins("pattern", c["front"], back=c["back"], pattern="pattern-decision",
+            hint=c.get("hint"), why=c.get("why"))
     for title, slug, pattern, diff in s.PROBLEMS:
-        ins("problem", title, url=f"https://leetcode.com/problems/{slug}/",
-            pattern=pattern, difficulty=diff)
+        nudge = s.PATTERN_NUDGES.get(pattern)
+        try:
+            cur.execute(
+                "INSERT INTO items(kind,title,url,pattern,difficulty,hint,created)"
+                " VALUES('problem',?,?,?,?,?,?)",
+                (title, f"https://leetcode.com/problems/{slug}/", pattern, diff, nudge,
+                 TODAY.isoformat()))
+            added += 1
+        except sqlite3.IntegrityError:
+            cur.execute("UPDATE items SET hint=? WHERE kind='problem' AND title=?",
+                        (nudge, title))
+
+    # retire cards that the seed no longer defines (their review log goes with them)
+    keep = {("ds", c["front"]) for c in s.DS_CARDS} | \
+           {("pattern", c["front"]) for c in s.PATTERN_CARDS}
+    stale = [r for r in cur.execute(
+        "SELECT id, kind, title FROM items WHERE kind IN ('ds','pattern')").fetchall()
+        if (r["kind"], r["title"]) not in keep]
+    for r in stale:
+        cur.execute("DELETE FROM log WHERE item_id=?", (r["id"],))
+        cur.execute("DELETE FROM items WHERE id=?", (r["id"],))
+    if stale:
+        print(f"{DIM}  retired {len(stale)} old card(s) replaced by the new deck{RST}")
     con.commit()
     return added
 
@@ -237,34 +271,25 @@ def grade_cap(hints):
     return max(3, 5 - hints)
 
 
-def split_chunks(text):
-    """Break an answer into spark-sized fragments (sentence-ish)."""
-    if not text:
-        return []
-    parts = re.split(r"(?<=[.!?])\s+|\n+", text.strip())
-    return [p.strip() for p in parts if p and p.strip()]
-
-
 class Hinter:
-    """Doles out answer fragments in random order; tracks how many you took.
+    """Hands out hint tiers in order and counts how many you took.
 
-    Random order (not first-to-last) means the hint is a genuine partial cue
-    that varies each time, rather than a memorizable reveal sequence."""
-    def __init__(self, text):
-        self.chunks = split_chunks(text)
-        self.order = list(range(len(self.chunks)))
-        random.shuffle(self.order)
+    A tier is a nudge that points at the answer without containing it (the
+    card's `hint`; for problems the pattern nudge, then the pattern name, then
+    your own note). Empty tiers are skipped. The answer itself is never a hint."""
+    def __init__(self, tiers):
+        self.chunks = [t.strip() for t in tiers if t and t.strip()]
         self.used = 0
 
     def reveal(self):
         if self.used >= len(self.chunks):
             return None
-        frag = self.chunks[self.order[self.used]]
+        frag = self.chunks[self.used]
         self.used += 1
         return frag
 
     def status(self):
-        """Short inline label for the prompt, e.g. '(3 hints, costs points)'."""
+        """Short inline label for the prompt, e.g. '(1 hint, costs points)'."""
         if not self.chunks:
             return ""
         if self.used == 0:
@@ -279,7 +304,7 @@ def offer_hint(hinter):
     """Print the next fragment; return True if one was shown."""
     frag = hinter.reveal()
     if frag is None:
-        print(f"{DIM}    (no more hints — that's the whole answer){RST}")
+        print(f"{DIM}    (no more hints){RST}")
         return False
     print(f"{YEL}    hint: {frag}{RST}")
     return True
@@ -313,7 +338,7 @@ def ask_grade(prompt="  grade [w]rong-but-sure [b]lanked [h]ard [g]ood [e]asy"
 def review_card(con, row):
     tag = "DS" if row["kind"] == "ds" else "PATTERN"
     print(f"\n{MAG}{BOLD}[{tag}]{RST} {BOLD}{row['title']}{RST}")
-    hinter = Hinter(row["back"])
+    hinter = Hinter([row["hint"]])
     while True:
         ans = input(f"{DIM}  ...recall it. Enter to reveal · {RST}"
                     f"{hinter.status()}{DIM} > {RST}").strip().lower()
@@ -322,6 +347,8 @@ def review_card(con, row):
             continue
         break
     print(f"{GRN}{wrap(row['back'])}{RST}")
+    if row["why"]:
+        print(f"{DIM}{wrap(row['why'])}{RST}")
     q = ask_grade(cap=grade_cap(hinter.used))
     if q == "quit":
         return "quit"
@@ -398,11 +425,10 @@ def review_problem(con, row, coach_on=False):
         run_coach(row)
     print(f"{DIM}  Now solve it COLD: commit to the plan, then code it. "
           f"No peeking until you're done.{RST}")
-    # hint source: the pattern is the biggest nudge; your own past insight next
-    hint_src = row["pattern"] or ""
-    if row["insight"]:
-        hint_src = f"{hint_src}. {row['insight']}" if hint_src else row["insight"]
-    hinter = Hinter(hint_src)
+    # hint tiers: a nudge that doesn't name the tool, then the pattern, then your note
+    hinter = Hinter([row["hint"],
+                     f"pattern: {row['pattern']}" if row["pattern"] else None,
+                     f"your note: {row['insight']}" if row["insight"] else None])
     while True:
         ans = input(f"{DIM}  [o] open in nvim · [?] hint · Enter when done "
                     f"(reveal pattern + note){RST} {hinter.status()} ").strip().lower()
@@ -588,9 +614,10 @@ def cmd_add(con, args):
 def cmd_addcard(con, args):
     try:
         con.execute(
-            "INSERT INTO items(kind,title,back,pattern,created) "
-            "VALUES('pattern',?,?,?,?)",
-            (args.front, args.back, "pattern-decision", TODAY.isoformat()))
+            "INSERT INTO items(kind,title,back,pattern,hint,why,created) "
+            "VALUES('pattern',?,?,?,?,?,?)",
+            (args.front, args.back, "pattern-decision", args.hint, args.why,
+             TODAY.isoformat()))
         con.commit()
         print(f"{GRN}Added pattern card.{RST}")
     except sqlite3.IntegrityError:
@@ -681,6 +708,8 @@ def main():
 
     ac = sub.add_parser("addcard", help="add a pattern-decision card")
     ac.add_argument("front"); ac.add_argument("back")
+    ac.add_argument("--hint", help="nudge shown by ? (must not contain the answer)")
+    ac.add_argument("--why", help="reminder printed after the reveal")
 
     l = sub.add_parser("list", help="list items")
     l.add_argument("--kind", choices=["ds", "pattern", "problem"])

@@ -51,15 +51,24 @@ its future intervals regrow slower, and `stats` counts these separately.
 
 ### Hints (press `?`)
 
-At any reveal/solve prompt, press **`?`** to uncover one *random* fragment of
-the answer. Randomized (not first-to-last) so it's a real partial cue that varies
-each time, meant to spark the rest of your recall rather than hand you the answer.
+At any reveal/solve prompt, press **`?`** for a hint. A hint is a *nudge* authored
+alongside the card: it points at the answer without containing it ("Sorted means
+you can rule out one end at a time"), so taking one never hands you the back of
+the card. Problems get three tiers in order: a per-pattern nudge that doesn't
+name the tool, then the pattern name, then your own past insight note.
 
-Taking a hint costs points: it **caps the grade you can claim** — 1 hint → max
-**Good**, 2+ → max **Hard**. That flows straight through the scheduler, so a
+Taking a hint costs points: it **caps the grade you can claim** -- 1 hint -> max
+**Good**, 2+ -> max **Hard**. That flows straight through the scheduler, so a
 hinted item comes back sooner, exactly proportional to how much help you needed.
 Grabbing a hint is fine and often worth it; the cap just keeps the signal honest.
 `stats` shows how many recent reviews leaned on one.
+
+### Cards are one fact each
+
+A DS card asks for exactly one thing (push/pop complexity; what a hash map does
+NOT give you; the Python class name), so a grade is unambiguous. A pattern card's
+back is the **tool only**; the explanation of why is printed after the reveal as
+a reminder, not as part of the answer you grade yourself on.
 
 ### Overwhelm control (no more snowballing)
 
@@ -90,8 +99,8 @@ that exact problem in a fresh kitty + nvim window via
 a `python3` code buffer, and `:Leet run` / `:Leet test` / `:Leet submit` against
 LeetCode. Solve there, alt-tab back to the review window, and grade as usual.
 (Pressing Enter instead reveals the pattern + your note, same as before; press
-**`?`** for a hint — the pattern name, then your own past insight note, one
-fragment at a time — at the cost of a capped grade.)
+**`?`** for a hint: a pattern nudge, then the pattern name, then your own past
+insight note, at the cost of a capped grade.)
 
 It opens straight to the problem (not the picker) through a custom `:LeetSlug
 <slug>` command defined in the nvim spec; srs.py extracts the slug from the
